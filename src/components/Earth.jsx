@@ -1,20 +1,34 @@
-import React, { useRef, useEffect } from 'react'
-import { useGLTF, useAnimations } from '@react-three/drei'
+import React, { useRef, useEffect, useState } from 'react'
+import { useGLTF, useAnimations, Text } from '@react-three/drei'
 import * as THREE from 'three'
-import { useFrame } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
 import { TextureLoader } from 'three'
+import Moon from './Moon'
 
 export default function Model(props) {
   const group = useRef()
   const cloudRef = useRef()
-  const earthRef = useRef() // Ref for the inner Earth
+  const earthRef = useRef()
+  const textRefs = useRef([])
+  const { camera } = useThree()
+
+  const [scrollY, setScrollY] = useState(0)
+
+  // Scroll listener
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrollY(window.scrollY)
+    }
+    window.addEventListener('scroll', handleScroll)
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
+
   const { nodes, materials, animations } = useGLTF('/earth.gltf', true)
   useAnimations(animations, group)
 
   useEffect(() => {
     const loader = new TextureLoader()
 
-    // Earth texture
     loader.load('/Material.001_baseColor.jpg', (texture) => {
       if (materials['Material.001']) {
         materials['Material.001'].map = texture
@@ -25,7 +39,6 @@ export default function Model(props) {
       }
     })
 
-    // Cloud texture
     loader.load('/textures/Material.002_baseColor.jpeg', (texture) => {
       if (materials['Material.002']) {
         materials['Material.002'].map = texture
@@ -38,24 +51,42 @@ export default function Model(props) {
     })
   }, [materials])
 
-  // Animate rotation
   useFrame((_, delta) => {
-    if (cloudRef.current) cloudRef.current.rotation.y += delta * 0.04 // faster
-    if (earthRef.current) earthRef.current.rotation.y += delta * 0.015 // slower than clouds
+    if (cloudRef.current) cloudRef.current.rotation.y += delta * 0.04
+    if (earthRef.current) earthRef.current.rotation.y += delta * 0.015
+
+    textRefs.current.forEach(ref => {
+      if (ref) ref.lookAt(camera.position)
+    })
+
+    // Apply scroll parallax to group Y position
+    if (group.current) {
+      group.current.position.y = -scrollY * 0.0015 // Tune this multiplier
+    }
+  })
+
+  // Text Label Positions (wrapped around)
+  const labelNames = ['Africa', 'Asia', 'Australia']
+  const radius = 7
+  const textLabels = labelNames.map((text, i) => {
+    const angle = (i / labelNames.length) * Math.PI * 2
+    const x = radius * Math.cos(angle)
+    const z = radius * Math.sin(angle)
+    return { text, position: [x, 0, z] }
   })
 
   return (
     <group ref={group} {...props} scale={4} dispose={null}>
       {/* Lighting */}
       <ambientLight intensity={0.3} />
-      <directionalLight position={[10, 10, 10]} intensity={1.5} color="#ffffff" />
-      <directionalLight position={[-10, 10, -10]} intensity={1.5} color="#ffffff" />
-      <directionalLight position={[10, -10, -10]} intensity={1.5} color="#ffffff" />
-      <directionalLight position={[-10, -10, 10]} intensity={1.5} color="#ffffff" />
-      <directionalLight position={[0, 15, 0]} intensity={1.2} color="#ffffff" />
-      <directionalLight position={[0, -15, 0]} intensity={1.2} color="#ffffff" />
-      <directionalLight position={[15, 0, 0]} intensity={1.2} color="#ffffff" />
-      <directionalLight position={[-15, 0, 0]} intensity={1.2} color="#ffffff" />
+      <directionalLight position={[10, 10, 10]} intensity={1.5} />
+      <directionalLight position={[-10, 10, -10]} intensity={1.5} />
+      <directionalLight position={[10, -10, -10]} intensity={1.5} />
+      <directionalLight position={[-10, -10, 10]} intensity={1.5} />
+      <directionalLight position={[0, 15, 0]} intensity={1.2} />
+      <directionalLight position={[0, -15, 0]} intensity={1.2} />
+      <directionalLight position={[15, 0, 0]} intensity={1.2} />
+      <directionalLight position={[-15, 0, 0]} intensity={1.2} />
 
       {/* Earth & Clouds */}
       <group name="Sketchfab_model" rotation={[-Math.PI / 2, 0, 0]}>
